@@ -1,8 +1,5 @@
 import streamlit as st
 from PIL import Image, ImageOps
-import torch
-import torch.nn.functional as F
-from transformers import CLIPProcessor, CLIPModel
 
 st.set_page_config(layout="centered", page_title="Fashion Spectrum", page_icon="👗")
 
@@ -18,6 +15,11 @@ def load_resources():
         tuple: 必要なリソース（デバイス、プロセッサー、モデル、スタイルデータなど）
     """
     print("✅ リソースを読み込み中...")
+
+    import torch
+    import torch.nn.functional as F
+    from transformers import CLIPProcessor, CLIPModel
+    
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model_name = "openai/clip-vit-base-patch32"
 
@@ -41,14 +43,18 @@ def load_resources():
         style_features = model.get_text_features(**text_inputs)
 
     print("✅ 読み込み完了！")
-    return device, processor, model, fashion_styles, style_categories, style_features
+    return device, processor, model, fashion_styles, style_categories, style_features, torch, F
 
-
-# グローバルなリソースを一度だけ読み込む
-device, processor, model, fashion_styles, style_categories, style_features = load_resources()
+def get_resources():
+    """
+    初回分析時にだけリソースを読み込み、以降は session_state から返す。
+    """
+    if "resources" not in st.session_state:
+        st.session_state["resources"] = load_resources()
+    return st.session_state["resources"]
 
 # --- 2. メイン処理のためのヘルパー関数 ---
-def calculate_centroid_vector(uploaded_images, weights):
+def calculate_centroid_vector(uploaded_images, weights, device, processor, model):
     """
     アップロードされた画像の重み付け平均（重心）ベクトルを計算します。
     
@@ -59,6 +65,9 @@ def calculate_centroid_vector(uploaded_images, weights):
     Returns:
         torch.Tensor: 計算された重心ベクトル
     """
+
+    import torch
+    
     # 重みをテンソルに変換
     weights_tensor = torch.tensor(weights, dtype=torch.float32).to(device)
 
@@ -141,13 +150,16 @@ def calculate_centroid_vector(uploaded_images, weights):
 
 #             st.plotly_chart(fig, use_container_width=True)
 
-def display_style_analysis(query_features_centroid):
+def display_style_analysis(query_features_centroid, fashion_styles, style_categories, style_features):
     """
     重心ベクトルに基づいて、スタイルの系統やカラーの分析結果を表示します。
     
     Args:
         query_features_centroid (torch.Tensor): 計算された重心ベクトル
     """
+
+    import torch.nn.functional as F
+
     st.header("Analysis Results (Style, Color, etc.)")
     st.write("We analyzed the attributes that describe your uploaded outfits.")
 
@@ -219,15 +231,23 @@ def main():
         # 分析実行ボタン
         st.markdown("---")
         if st.button("Run analysis"):
-            with st.spinner("Analyzing..."):
-                # 重心ベクトルを計算
-                query_features_centroid = calculate_centroid_vector(query_images, weights)
+            with st.spinner("Loading resources (first time) & analyzing..."):
+                # ここで初回だけロードされる
+                device, processor, model, fashion_styles, style_categories, style_features, torch, F = get_resources()
 
-                # 計算が成功した場合にのみ次の処理を実行
+                query_features_centroid = calculate_centroid_vector(
+                    query_images, weights,
+                    device=device, processor=processor, model=model
+                )
+
                 if query_features_centroid is not None:
-                    # 各分析結果を表示
                     st.markdown("---")
-                    display_style_analysis(query_features_centroid)
+                    display_style_analysis(
+                        query_features_centroid,
+                        fashion_styles=fashion_styles,
+                        style_categories=style_categories,
+                        style_features=style_features
+                    )
 
 
 # アプリケーションの開始点
