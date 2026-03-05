@@ -132,18 +132,39 @@ def calculate_centroid_vector(uploaded_images, weights, device, processor, model
 
     return query_features_centroid
 
+def normalize_score_minmax(value, vmin, vmax, eps=1e-12):
+    """
+    value を [vmin, vmax] で min-max 正規化して [0,1] にする。
+    クリップも行う（レンジ外でも崩れない）。
+    """
+    if vmin is None or vmax is None:
+        return value  # statsが無ければそのまま返す
+
+    denom = (vmax - vmin)
+    if abs(denom) < eps:
+        # min==max 付近（分布が潰れてる）なら真ん中扱い
+        return 0.5
+
+    norm = (value - vmin) / denom
+    # 0〜1にクリップ（1%/99%設計と相性がいい）
+    return max(0.0, min(1.0, norm))
 
 def display_style_analysis(
     query_features_centroid,
     fashion_styles,
     style_categories,
     style_features,
+    attribute_norm_stats=None,
 ):
     """
     スタイル分析結果をレーダーチャートで表示
     """
 
     import torch.nn.functional as F
+
+    # None対策（呼び出し側が渡さなくても落ちない）
+    if attribute_norm_stats is None:
+        attribute_norm_stats = {}
 
     for category_name, attributes in style_categories.items():
 
@@ -165,8 +186,14 @@ def display_style_analysis(
                 # [-1,1] → [0,1]
                 sim01 = (sim + 1.0) / 2.0
 
+                # attributeごとのmin/maxで再正規化（1%/99%想定）
+                stat = attribute_norm_stats.get(attribute, {})
+                vmin = stat.get("min")
+                vmax = stat.get("max")
+                score_norm = normalize_score_minmax(sim01, vmin, vmax)
+
                 labels.append(attribute)
-                scores.append(sim01)
+                scores.append(score_norm)
 
             except ValueError:
                 continue
@@ -261,6 +288,20 @@ def main():
             query_images.append(image)
             weights.append(weight)
 
+        # 外部から渡すmin/max（将来的にDB由来に置き換える）
+        attribute_norm_stats = {
+            "streetwear": {"min": 0.59, "max": 0.64},
+            "vintage": {"min": 0.59, "max": 0.64},
+            "sporty": {"min": 0.59, "max": 0.64},
+            "elegant": {"min": 0.59, "max": 0.64},
+            "preppy": {"min": 0.59, "max": 0.64},
+            "punk": {"min": 0.59, "max": 0.64},
+            "gothic": {"min": 0.59, "max": 0.64},
+            "hippie": {"min": 0.59, "max": 0.64},
+            "grunge": {"min": 0.59, "max": 0.64},
+            "y2k": {"min": 0.59, "max": 0.64},
+        }
+
         # 分析実行
         if st.button("Run analysis"):
 
@@ -287,6 +328,7 @@ def main():
                         fashion_styles=fashion_styles,
                         style_categories=style_categories,
                         style_features=style_features,
+                        attribute_norm_stats=attribute_norm_stats,
                     )
 
 
