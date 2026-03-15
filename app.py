@@ -34,7 +34,7 @@ def load_resources():
     # スタイルカテゴリ
     style_categories = {
 
-        "Basic Spectrum": [
+        "Basic": [
             "formal",
             "classic",
             "minimalist",
@@ -45,7 +45,7 @@ def load_resources():
             "colorful",
         ],
 
-        "Culture Spectrum": [
+        "Culture": [
             "streetwear",
             "vintage",
             "sporty",
@@ -215,32 +215,44 @@ def display_style_analysis(
             st.info("No attributes found for this category.")
             continue
 
-        # radar chart は閉じる必要がある
-        labels_closed = labels + [labels[0]]
-        scores_closed = scores + [scores[0]]
+        if category_name == "Basic":
+            # radar chart は閉じる必要がある
+            labels_closed = labels + [labels[0]]
+            scores_closed = scores + [scores[0]]
 
-        fig = go.Figure()
+            fig = go.Figure()
 
-        fig.add_trace(
-            go.Scatterpolar(
-                r=scores_closed,
-                theta=labels_closed,
-                fill="toself",
-            )
-        )
-
-        fig.update_layout(
-            polar=dict(
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 1],
+            fig.add_trace(
+                go.Scatterpolar(
+                    r=scores_closed,
+                    theta=labels_closed,
+                    fill="toself",
                 )
-            ),
-            showlegend=False,
-            margin=dict(l=20, r=20, t=20, b=20),
-        )
+            )
 
-        st.plotly_chart(fig, use_container_width=True)
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 1],
+                    )
+                ),
+                showlegend=False,
+                margin=dict(l=20, r=20, t=20, b=20),
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif category_name == "Culture":
+            ranked_items = sorted(
+                zip(labels, scores),
+                key=lambda x: x[1],
+                reverse=True,
+            )[:3]
+
+            for label, score in ranked_items:
+                st.write(label)
+                st.progress(float(score))
 
 
 # --------------------------------------------------
