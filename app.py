@@ -302,9 +302,31 @@ def display_style_analysis(
             continue
 
         if category_name == "Basic":
+            score_map = dict(zip(labels, scores))
+            opposite_pairs = [
+                ("formal", "casual"),
+                ("classic", "modern"),
+                ("colorful", "monochrome"),
+                ("detailed", "minimalist"),
+            ]
+
+            plot_labels = []
+            plot_scores = []
+
+            for left, right in opposite_pairs:
+                left_score = score_map.get(left, 0.0)
+                right_score = score_map.get(right, 0.0)
+
+                if left_score >= right_score:
+                    plot_labels.append(left)
+                    plot_scores.append(left_score)
+                else:
+                    plot_labels.append(right)
+                    plot_scores.append(right_score)
+
             # radar chart は閉じる必要がある
-            labels_closed = labels + [labels[0]]
-            scores_closed = scores + [scores[0]]
+            labels_closed = plot_labels + [plot_labels[0]]
+            scores_closed = plot_scores + [plot_scores[0]]
 
             fig = go.Figure()
 
@@ -321,7 +343,11 @@ def display_style_analysis(
                     radialaxis=dict(
                         visible=True,
                         range=[0, 1],
-                    )
+                    ),
+                    angularaxis=dict(
+                        categoryorder="array",
+                        categoryarray=labels,
+                    ),
                 ),
                 showlegend=False,
                 margin=dict(l=20, r=20, t=20, b=20),
