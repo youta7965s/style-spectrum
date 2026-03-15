@@ -319,10 +319,10 @@ def display_style_analysis(
 
                 if left_score >= right_score:
                     plot_labels.append(left)
-                    plot_scores.append(left_score)
+                    plot_scores.append(left_score - right_score)
                 else:
                     plot_labels.append(right)
-                    plot_scores.append(right_score)
+                    plot_scores.append(right_score - left_score)
 
             # radar chart は閉じる必要がある
             labels_closed = plot_labels + [plot_labels[0]]
@@ -335,6 +335,7 @@ def display_style_analysis(
                     r=scores_closed,
                     theta=labels_closed,
                     fill="toself",
+                    line_shape="spline",
                 )
             )
 
