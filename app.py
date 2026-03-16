@@ -271,6 +271,7 @@ def display_style_analysis(
 
         labels = []
         scores = []
+        raw_scores = []
 
         # cosine similarity
         for attribute in attributes:
@@ -285,24 +286,28 @@ def display_style_analysis(
                 # [-1,1] → [0,1]
                 sim01 = (sim + 1.0) / 2.0
 
-                # attributeごとのmin/maxで再正規化（1%/99%想定）
-                stat = attribute_norm_stats.get(attribute, {})
-                vmin = stat.get("min")
-                vmax = stat.get("max")
-                score_norm = normalize_score_minmax(sim01, vmin, vmax)
+                if category_name == "Basic":
+                    labels.append(attribute)
+                    raw_scores.append(sim01)
+                else:
+                    # attributeごとのmin/maxで再正規化（1%/99%想定）
+                    stat = attribute_norm_stats.get(attribute, {})
+                    vmin = stat.get("min")
+                    vmax = stat.get("max")
+                    score_norm = normalize_score_minmax(sim01, vmin, vmax)
 
-                labels.append(attribute)
-                scores.append(score_norm)
+                    labels.append(attribute)
+                    scores.append(score_norm)
 
             except ValueError:
                 continue
 
-        if len(scores) == 0:
-            st.info("No attributes found for this category.")
-            continue
-
         if category_name == "Basic":
-            score_map = dict(zip(labels, scores))
+            if len(raw_scores) == 0:
+                st.info("No attributes found for this category.")
+                continue
+
+            score_map = dict(zip(labels, raw_scores))
             opposite_pairs = [
                 ("formal", "casual"),
                 ("classic", "modern"),
@@ -318,11 +323,23 @@ def display_style_analysis(
                 right_score = score_map.get(right, 0.0)
 
                 if left_score >= right_score:
+                    diff_score = left_score - right_score
+                    stat = attribute_norm_stats.get(f"{left}_vs_{right}", {})
+                    vmin = stat.get("min")
+                    vmax = stat.get("max")
                     plot_labels.append(left)
-                    plot_scores.append(left_score - right_score)
+                    plot_scores.append(
+                        normalize_score_minmax(diff_score, vmin, vmax)
+                    )
                 else:
+                    diff_score = right_score - left_score
+                    stat = attribute_norm_stats.get(f"{left}_vs_{right}", {})
+                    vmin = stat.get("min")
+                    vmax = stat.get("max")
                     plot_labels.append(right)
-                    plot_scores.append(right_score - left_score)
+                    plot_scores.append(
+                        normalize_score_minmax(diff_score, vmin, vmax)
+                    )
 
             # radar chart は閉じる必要がある
             labels_closed = plot_labels + [plot_labels[0]]
@@ -357,6 +374,10 @@ def display_style_analysis(
             st.plotly_chart(fig, use_container_width=True)
 
         elif category_name == "Culture":
+            if len(scores) == 0:
+                st.info("No attributes found for this category.")
+                continue
+
             ranked_items = sorted(
                 zip(labels, scores),
                 key=lambda x: x[1],
@@ -428,14 +449,11 @@ def main():
 
         # 外部から渡すmin/max（将来的にDB由来に置き換える）
         attribute_norm_stats = {
-            "formal": {"min": 0.59, "max": 0.64},
-            "classic": {"min": 0.59, "max": 0.64},
-            "minimalist": {"min": 0.59, "max": 0.64},
-            "monochrome": {"min": 0.59, "max": 0.64},
-            "casual": {"min": 0.59, "max": 0.64},
-            "modern": {"min": 0.59, "max": 0.64},
-            "detailed": {"min": 0.59, "max": 0.64},
-            "colorful": {"min": 0.59, "max": 0.64},
+            "formal_vs_casual": {"min": 0.0, "max": 0.05},
+            "classic_vs_modern": {"min": 0.0, "max": 0.05},
+            "colorful_vs_monochrome": {"min": 0.0, "max": 0.05},
+            "detailed_vs_minimalist": {"min": 0.0, "max": 0.05},
+
             "streetwear": {"min": 0.59, "max": 0.64},
             "vintage": {"min": 0.59, "max": 0.64},
             "sporty": {"min": 0.59, "max": 0.64},
